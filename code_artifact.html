@@ -1,0 +1,1806 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>小学校学習指導要領ベース 授業案・配慮支援・ワークシート・板書計画ジェネレーター</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            chalk: ['"Yu Kyokasho"', '"Klee One"', 'Courier New', 'monospace']
+          },
+        }
+      }
+    };
+  </script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&family=Klee+One:wght@600&display=swap" rel="stylesheet">
+  
+  <!-- html2pdf.js (PDF直接ダウンロード用) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <!-- Firebase Imports -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, getDoc, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'lesson-plan-generator';
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
+
+    let app, auth, db;
+    if (Object.keys(firebaseConfig).length > 0) {
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+    }
+
+    window.db = db;
+    window.auth = auth;
+    window.appId = appId;
+    window.initialAuthToken = initialAuthToken;
+    window.signInAnonymously = signInAnonymously;
+    window.signInWithCustomToken = signInWithCustomToken;
+    window.doc = doc;
+    window.setDoc = setDoc;
+    window.getDoc = getDoc;
+    window.collection = collection;
+    window.addDoc = addDoc;
+  </script>
+  <style>
+    .font-chalk {
+      font-family: 'Klee One', 'Yu Kyokasho', 'Hiragino Maru Gothic ProN', sans-serif;
+    }
+
+    /* 黒板風スタイル（木枠・チョーク置き場・黒板消し） */
+    .blackboard-frame {
+      background: linear-gradient(145deg, #1b3b2b 0%, #142c20 100%);
+      border: 12px solid #7c4d2b;
+      border-radius: 12px;
+      box-shadow: inset 0 0 35px rgba(0, 0, 0, 0.55), 0 10px 22px rgba(0, 0, 0, 0.16);
+      position: relative;
+      color: #f8fafc;
+    }
+    .blackboard-tray {
+      height: 14px;
+      background: linear-gradient(to bottom, #8d5b34, #5e3a1e);
+      border-radius: 0 0 6px 6px;
+      margin: 14px -12px -12px -12px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding-right: 28px;
+      gap: 10px;
+    }
+    .chalk-white {
+      width: 26px;
+      height: 5px;
+      background: #ffffff;
+      border-radius: 3px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    }
+    .chalk-yellow {
+      width: 22px;
+      height: 5px;
+      background: #fde047;
+      border-radius: 3px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    }
+    .chalk-eraser {
+      width: 44px;
+      height: 11px;
+      background: #1e293b;
+      border-top: 4px solid #f97316;
+      border-radius: 2px;
+      margin-top: -5px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    }
+
+    /* ワークシート（A4プリント風罫線） */
+    .ruled-lines {
+      background-image: repeating-linear-gradient(
+        to bottom,
+        transparent,
+        transparent 31px,
+        #cbd5e1 31px,
+        #cbd5e1 32px
+      );
+      line-height: 32px;
+    }
+
+    /* PDF・印刷用の設定（途切れ・見切れを防止） */
+    @media print {
+      @page {
+        margin: 10mm;
+      }
+      body {
+        background-color: white !important;
+        color: black !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      .print-card {
+        box-shadow: none !important;
+        border: 1px solid #94a3b8 !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        margin-bottom: 2rem !important;
+      }
+      .worksheet-page-break {
+        page-break-before: always !important;
+        break-before: page !important;
+        border: 2px solid #000000 !important;
+      }
+      .blackboard-print {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      /* Flexbox/Gridによる印刷崩れを防止しつつ、必要な箇所は維持する */
+      main {
+        display: block !important;
+      }
+      .filter-section {
+        display: block !important;
+        width: 100% !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+
+  <!-- ヘッダー -->
+  <header class="no-print bg-emerald-800 text-white shadow-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="bg-white/10 p-2 rounded-xl border border-white/20">
+          <svg class="w-6 h-6 text-emerald-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold tracking-tight">単元作成ボード ＆ 授業案・配慮支援・ワークシート・板書計画</h1>
+          <p class="text-xs text-emerald-100 opacity-90">教科書リサーチ × 学習指導要領 × 合理的配慮 × A4ワークシート × 黒板図解</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="samplePresetBtn" type="button" class="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold shadow-sm transition">
+          ✨ サンプル切替（ごんぎつね / わり算）
+        </button>
+        <button id="copyTextBtn" type="button" class="px-3.5 py-1.5 rounded-lg bg-white text-emerald-900 hover:bg-emerald-50 text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+          テキストコピー
+        </button>
+        <button id="shareLinkBtn" type="button" class="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
+          ファイル共有
+        </button>
+        <button id="printBtn" type="button" class="px-3.5 py-1.5 rounded-lg bg-emerald-950 hover:bg-black text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+          印刷 / PDF
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- メインコンテンツ -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+    <!-- 左カラム：単元作成ボード（入力フォーム） -->
+    <aside class="no-print lg:col-span-4 bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 sticky top-20">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+        <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+          単元作成ボード（条件設定）
+        </h2>
+        <span id="modeIndicator" class="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-bold border border-emerald-200">準備完了</span>
+      </div>
+
+      <form id="lessonForm" class="space-y-4">
+        <!-- 学年・教科 -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="gradeSelect" class="block text-xs font-bold text-slate-700 mb-1">学年</label>
+            <select id="gradeSelect" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition">
+              <option value="小学1年">小学1年</option>
+              <option value="小学2年">小学2年</option>
+              <option value="小学3年">小学3年</option>
+              <option value="小学4年" selected>小学4年</option>
+              <option value="小学5年">小学5年</option>
+              <option value="小学6年">小学6年</option>
+              <option value="特別支援学級">特別支援学級（全学年）</option>
+            </select>
+          </div>
+          <div>
+            <label for="subjectSelect" class="block text-xs font-bold text-slate-700 mb-1">教科・領域</label>
+            <select id="subjectSelect" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition">
+              <option value="国語" selected>国語</option>
+              <option value="社会">社会</option>
+              <option value="算数">算数</option>
+              <option value="理科">理科</option>
+              <option value="生活">生活</option>
+              <option value="音楽">音楽</option>
+              <option value="図画工作">図画工作</option>
+              <option value="家庭">家庭</option>
+              <option value="体育">体育</option>
+              <option value="外国語・外国語活動">外国語・外国語活動</option>
+              <option value="道徳">道徳</option>
+              <option value="総合的な学習の時間">総合的な学習の時間</option>
+              <option value="特別活動（学級活動）">特別活動（学級活動）</option>
+              <option value="自立活動">自立活動（特別支援）</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 教科書会社・本時の時間 -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="textbookSelect" class="block text-xs font-bold text-slate-700 mb-1">使用教科書</label>
+            <select id="textbookSelect" class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 bg-white focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition">
+              <option value="光村図書" selected>光村図書</option>
+              <option value="東京書籍">東京書籍</option>
+              <option value="啓林館">啓林館</option>
+              <option value="教育出版">教育出版</option>
+              <option value="学校図書">学校図書</option>
+              <option value="日本文教出版">日本文教出版</option>
+              <option value="大日本図書">大日本図書</option>
+              <option value="三省堂">三省堂</option>
+              <option value="開隆堂">開隆堂</option>
+              <option value="学研（Gakken）">学研（Gakken）</option>
+              <option value="広済堂あかつき">広済堂あかつき</option>
+              <option value="指定なし（学習指導要領準拠）">指定なし</option>
+            </select>
+          </div>
+          <div>
+            <label for="lessonTimeInput" class="block text-xs font-bold text-slate-700 mb-1">本時の時間</label>
+            <input type="text" id="lessonTimeInput" placeholder="例：4/10時間" value="4/10時間"
+              class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition" />
+          </div>
+        </div>
+
+        <!-- 単元名 -->
+        <div>
+          <label for="unitInput" class="block text-xs font-bold text-slate-700 mb-1">単元名・題材名 <span class="text-rose-500">*</span></label>
+          <input type="text" id="unitInput" required placeholder="例：ごんぎつね、あまりのあるわり算" value="ごんぎつね"
+            class="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition" />
+        </div>
+
+        <!-- 本時のねらい・テーマ（任意） -->
+        <div>
+          <label for="themeInput" class="block text-xs font-bold text-slate-700 mb-1">本時のねらい・テーマ（任意）</label>
+          <textarea id="themeInput" rows="2" placeholder="空欄の場合は、教科書単元の流れと本時の時間から自動で最適化されます"
+            class="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800 placeholder-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-600/20 outline-none transition resize-none"></textarea>
+        </div>
+
+        <!-- 特別支援・合理的配慮 チェックボックス -->
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5">
+          <label class="flex items-start gap-2.5 cursor-pointer">
+            <input type="checkbox" id="specialNeedsCheck" class="mt-0.5 w-4 h-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500">
+            <div>
+              <span class="block text-xs font-bold text-amber-950">特別支援・合理的配慮（重点強化モード）</span>
+              <span class="block text-[11px] text-amber-800 leading-relaxed mt-0.5">
+                未チェックでも全展開に基本の配慮・支援を出力します。チェックすると、個別の困り感（感覚・切り替え・書字・見通し）への具体的な代替手段を手厚く追加します。
+              </span>
+            </div>
+          </label>
+        </div>
+
+        <!-- 配慮事項・授業スタイルチェック -->
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1.5">授業の工夫・ICT活用</label>
+          <div class="space-y-1.5 text-xs text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <label class="flex items-center gap-2 cursor-pointer hover:text-emerald-800">
+              <input type="checkbox" name="considerations" value="GIGA端末（Chromebook）活用" checked class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+              GIGA端末（Chromebook）活用
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer hover:text-emerald-800">
+              <input type="checkbox" name="considerations" value="ペア・グループ対話" checked class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+              ペア・グループ対話
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer hover:text-emerald-800">
+              <input type="checkbox" name="considerations" value="視覚支援・ユニバーサルデザイン（UDL）" checked class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+              視覚支援・UDL
+            </label>
+          </div>
+        </div>
+
+        <!-- 生成ボタン -->
+        <div class="pt-2 flex gap-2">
+          <button type="submit" id="generateBtn" class="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3 px-4 rounded-xl shadow-md shadow-emerald-700/20 transition flex items-center justify-center gap-2 text-sm">
+            <svg class="w-4 h-4 animate-spin hidden" id="spinnerIcon" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+            授業案・配慮支援・シート・板書生成
+          </button>
+          <button type="button" id="resetBtn" class="px-3.5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs transition">
+            リセット
+          </button>
+        </div>
+      </form>
+    </aside>
+
+    <!-- 右カラム：生成された授業案＆ワークシート＆板書計画ドキュメント -->
+    <section class="lg:col-span-8 space-y-6">
+
+      <!-- 表示切替タブ（画面操作用） -->
+      <div class="no-print bg-white rounded-xl shadow-sm border border-slate-200 p-2 flex flex-wrap gap-1.5 sticky top-16 z-30">
+        <button type="button" data-filter="all" class="tab-btn bg-emerald-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">すべて表示</button>
+        <button type="button" data-filter="sec-plan" class="tab-btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg transition">① 指導要領・単元計画・目標</button>
+        <button type="button" data-filter="sec-eval" class="tab-btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg transition">② 評価規準</button>
+        <button type="button" data-filter="sec-flow" class="tab-btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg transition">③ 45分の展開（配慮・支援付）</button>
+        <button type="button" data-filter="sec-worksheet" class="tab-btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg transition">④ 本時のワークシート</button>
+        <button type="button" data-filter="sec-board" class="tab-btn bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg transition">⑤ 板書計画（黒板図）</button>
+      </div>
+
+      <!-- ローディングオーバーレイ -->
+      <div id="loadingBox" class="hidden bg-white/90 backdrop-blur-sm rounded-2xl p-8 border border-emerald-200 text-center shadow-sm">
+        <div class="inline-block animate-spin rounded-full h-9 w-9 border-4 border-emerald-600 border-t-transparent mb-3"></div>
+        <p id="loadingStepText" class="text-sm font-bold text-slate-800">Google検索で教科書単元・学習指導要領をリサーチ中...</p>
+        <p class="text-xs text-slate-500 mt-1">配慮・支援、A4ワークシート、黒板図解を一括構築しています</p>
+      </div>
+
+      <!-- 出力指導案ドキュメント本体 -->
+      <div id="lessonDocument" class="space-y-6">
+
+        <!-- ① 基本情報＆単元計画＆本時の目標 -->
+        <article id="sec-plan" class="filter-section bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 print-card">
+          <div class="border-b-2 border-emerald-700 pb-3 mb-4 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <div class="flex flex-wrap items-center gap-2 mb-1">
+                <span id="outGradeBadge" class="px-2.5 py-0.5 rounded-md bg-emerald-700 text-white text-xs font-bold">小学4年</span>
+                <span id="outSubjectBadge" class="px-2.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-xs font-bold">国語</span>
+                <span id="outTextbookBadge" class="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-700 text-xs font-bold">光村図書</span>
+                <span id="outSpecialNeedsBadge" class="hidden px-2.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold">★ 合理的配慮 重点強化中</span>
+              </div>
+              <h2 id="outUnitTitle" class="text-xl sm:text-2xl font-bold text-slate-900">単元名：ごんぎつね</h2>
+            </div>
+            <div id="outLessonTimeBadge" class="text-xs font-bold text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+              本時：4/10時間（45分）
+            </div>
+          </div>
+
+          <!-- 選択された配慮タグ -->
+          <div id="outConsiderations" class="flex flex-wrap gap-1.5 mb-4"></div>
+
+          <!-- 学習指導要領・教科書リサーチ結果 -->
+          <div class="bg-slate-50 rounded-xl p-3.5 border border-slate-200/80 mb-5 text-xs text-slate-700 space-y-2">
+            <div>
+              <span class="font-bold text-emerald-800 mr-2">【学習指導要領・教科書参照】</span>
+              <span id="outCurriculumRef"></span>
+            </div>
+            <div id="outSearchSourcesBox" class="hidden pt-2 border-t border-slate-200/80 flex flex-wrap items-center gap-1.5 text-[11px]">
+              <span class="font-bold text-slate-500">参照Webソース：</span>
+              <div id="outSearchSourcesList" class="flex flex-wrap gap-1.5"></div>
+            </div>
+          </div>
+
+          <!-- 単元的目標・単元指導計画 -->
+          <div class="mb-6 bg-slate-50/70 rounded-xl border border-slate-200 p-4 space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-2">
+              <h3 class="text-xs font-bold text-emerald-800 uppercase tracking-wider flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                単元の目標と単元指導計画（全時間の見通し）
+              </h3>
+              <span class="text-[11px] text-slate-500">本時の位置づけを明確化</span>
+            </div>
+            <p id="outUnitGoal" class="text-xs text-slate-800 font-medium leading-relaxed bg-white p-3 rounded-lg border border-slate-200/80"></p>
+            <div class="overflow-x-auto bg-white rounded-lg border border-slate-200/80">
+              <table class="w-full text-left text-xs">
+                <thead>
+                  <tr class="bg-slate-100/80 border-b border-slate-200 text-slate-600">
+                    <th class="py-2 px-3 font-bold w-28">次・時</th>
+                    <th class="py-2 px-3 font-bold">主な学習活動とねらい</th>
+                    <th class="py-2 px-3 font-bold w-28 text-center">重点評価観点</th>
+                  </tr>
+                </thead>
+                <tbody id="outUnitPlanBody" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- 本時の目標 -->
+          <div class="mb-5">
+            <h3 class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">本時の目標（ねらい）</h3>
+            <div class="bg-emerald-50/60 border-l-4 border-emerald-600 p-4 rounded-r-xl text-sm font-bold text-slate-900 leading-relaxed" id="outObjective"></div>
+          </div>
+
+          <!-- 3つの柱に基づく目標 -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold mb-1">知識・技能</span>
+              <p id="outPillarKnowledge" class="text-xs text-slate-700 leading-relaxed"></p>
+            </div>
+            <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <span class="inline-block px-2 py-0.5 rounded bg-sky-100 text-sky-800 text-[10px] font-bold mb-1">思考・判断・表現</span>
+              <p id="outPillarThinking" class="text-xs text-slate-700 leading-relaxed"></p>
+            </div>
+            <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+              <span class="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold mb-1">主体的に学習</span>
+              <p id="outPillarAttitude" class="text-xs text-slate-700 leading-relaxed"></p>
+            </div>
+          </div>
+        </article>
+
+        <!-- ② 評価規準（3観点） -->
+        <article id="sec-eval" class="filter-section bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 print-card">
+          <div class="border-b border-slate-100 pb-3 mb-4 flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+              評価規準の設定（3観点）
+            </h3>
+            <span class="text-xs text-slate-500">おおむね満足できる状況（B基準）</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead>
+                <tr class="border-b border-slate-200 text-slate-500">
+                  <th class="py-2.5 px-3 font-bold w-1/4">観点</th>
+                  <th class="py-2.5 px-3 font-bold w-1/2">評価規準（B基準の具体例）</th>
+                  <th class="py-2.5 px-3 font-bold w-1/4">見取りの方法</th>
+                </tr>
+              </thead>
+              <tbody id="outEvaluationBody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <!-- ③ 45分の授業展開（「配慮・支援」列を追加） -->
+        <article id="sec-flow" class="filter-section bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 print-card">
+          <div class="border-b border-slate-100 pb-3 mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+              本時の展開（45分タイムライン）と「配慮・支援」
+            </h3>
+            <span class="text-xs text-amber-800 bg-amber-50 px-2.5 py-0.5 rounded font-bold border border-amber-200">想定される困り感（タイプ別）と具体的な手立て</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="border-b border-slate-200 text-slate-600 bg-slate-50">
+                  <th class="py-2.5 px-2 font-bold w-20 text-center">学習過程</th>
+                  <th class="py-2.5 px-3 font-bold w-[30%]">学習活動・児童の反応（C）</th>
+                  <th class="py-2.5 px-3 font-bold w-[30%]">教師の発問（T）・支援・評価</th>
+                  <th class="py-2.5 px-3 font-bold w-[32%] bg-amber-50 text-amber-950 border-l border-amber-200">配慮・支援（困り感と具体策）</th>
+                </tr>
+              </thead>
+              <tbody id="outFlowBody" class="divide-y divide-slate-200"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <!-- ④ 本時のワークシート（A4配布レイアウト） -->
+        <article id="sec-worksheet" class="filter-section bg-white rounded-2xl shadow-sm border-2 border-slate-700 p-6 sm:p-8 print-card worksheet-page-break">
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b-2 border-slate-800 pb-3 mb-4">
+            <div>
+              <span class="text-[11px] font-bold tracking-wider text-slate-500 block">本時のワークシート（A4印刷・配布用）</span>
+              <h3 id="wsTitle" class="text-lg sm:text-xl font-black text-slate-900 mt-0.5"></h3>
+            </div>
+            <div class="text-xs sm:text-sm font-bold text-slate-800 border border-slate-800 px-3.5 py-2 rounded">
+              <span id="wsGradeLabel">4年</span>（　）組　名前（　　　　　　　　　　）
+            </div>
+          </div>
+
+          <!-- めあて枠 -->
+          <div class="border-2 border-slate-800 rounded-lg p-3 mb-5 bg-slate-50 flex flex-wrap items-center gap-2">
+            <span class="bg-slate-800 text-white text-xs font-bold px-2.5 py-0.5 rounded shrink-0">きょうのめあて</span>
+            <span id="wsGoal" class="font-bold text-xs sm:text-sm text-slate-900"></span>
+          </div>
+
+          <!-- 設問エリア -->
+          <div id="wsQuestionsContainer" class="space-y-4"></div>
+
+          <!-- 困ったときのヒント欄 -->
+          <div class="mt-5 border-2 border-dashed border-slate-500 rounded-xl p-4 bg-slate-50">
+            <div class="flex items-center gap-2 mb-1.5">
+              <span class="bg-slate-700 text-white text-xs font-bold px-2.5 py-0.5 rounded">こまったときのヒント</span>
+              <span class="text-xs font-bold text-slate-600">（どこから書けばいいか迷ったら見てみよう）</span>
+            </div>
+            <ul id="wsHintsList" class="text-xs text-slate-800 space-y-1 list-disc list-inside leading-relaxed"></ul>
+          </div>
+        </article>
+
+        <!-- ⑤ ビジュアル板書計画（黒板の見た目を再現した図） -->
+        <article id="sec-board" class="filter-section bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 print-card">
+          <div class="border-b border-slate-100 pb-3 mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-600"></span>
+              板書計画（黒板レイアウト図・45分完成イメージ）
+            </h3>
+            <span class="text-xs text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded font-bold border border-emerald-200">左（課題）→ 中央（比較・深め合い）→ 右（赤枠まとめ）</span>
+          </div>
+
+          <!-- 黒板風プレビューボックス -->
+          <div class="blackboard-print blackboard-frame p-4 sm:p-6 font-chalk space-y-4">
+            <!-- 黒板上部の日付・単元・色分け凡例 -->
+            <div class="border-b-2 border-white/25 pb-3 flex flex-wrap justify-between items-center gap-2 text-xs">
+              <span id="boardDateTitle" class="text-white font-bold tracking-wide"></span>
+              <!-- 図中の色分け凡例 -->
+              <div class="flex flex-wrap items-center gap-2.5 bg-black/30 px-3 py-1 rounded-md border border-white/20 text-[11px]">
+                <span class="font-bold text-emerald-200">【凡例】</span>
+                <span class="flex items-center gap-1 text-white">
+                  <span class="w-2.5 h-2.5 rounded-full bg-white inline-block"></span>白＝児童の読み取り・事実
+                </span>
+                <span class="flex items-center gap-1 text-[#fde047]">
+                  <span class="w-2.5 h-2.5 rounded-full bg-[#fde047] inline-block"></span>黄＝めあて・重要な発見
+                </span>
+                <span class="flex items-center gap-1 text-[#fca5a5] font-bold">
+                  <span class="w-3 h-2.5 border-2 border-[#f87171] inline-block"></span>赤枠＝まとめ
+                </span>
+              </div>
+            </div>
+
+            <!-- 黒板メインエリア（左・中央・右の実際の配置） -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5 items-stretch pt-1">
+              <!-- 左エリア（3列）：めあて・課題・手がかり -->
+              <div class="md:col-span-3 flex flex-col gap-3">
+                <div class="bg-[#13291d] p-3 rounded-lg border-2 border-[#facc15]">
+                  <div class="text-[11px] text-[#fde047] font-bold mb-1">【めあて】</div>
+                  <p id="boardGoal" class="text-xs text-[#fef08a] font-bold leading-relaxed"></p>
+                </div>
+                <div class="bg-[#142a1e]/90 p-3 rounded-lg border border-white/25 flex-1 space-y-2">
+                  <div class="text-[11px] text-[#fde047] font-bold">【左：課題・前時の確認】</div>
+                  <p id="boardLeftContent" class="text-xs text-white leading-relaxed whitespace-pre-line"></p>
+                  <div class="text-[11px] text-[#fef08a] bg-[#1a3626] p-2 rounded border border-[#facc15]/60" id="boardLeftNote"></div>
+                </div>
+              </div>
+
+              <!-- 中央エリア（6列）：児童の読み取り・対比・重要な発見 -->
+              <div class="md:col-span-6 bg-[#142a1e]/90 p-3.5 rounded-lg border border-white/25 flex flex-col justify-between space-y-3">
+                <div>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-[11px] text-[#fde047] font-bold">【中央：児童の読み取り・比較構造】</span>
+                    <span class="text-[10px] text-emerald-200/80">◀ つなげて考える ▶</span>
+                  </div>
+                  <p id="boardCenterContent" class="text-xs text-white leading-relaxed whitespace-pre-line"></p>
+                </div>
+                <div class="text-xs text-[#fde047] bg-[#1a3626] p-2.5 rounded border-2 border-[#facc15] font-bold" id="boardCenterHighlight"></div>
+              </div>
+
+              <!-- 右エリア（3列）：赤枠まとめ・振り返り -->
+              <div class="md:col-span-3 bg-[#142a1e]/90 p-3 rounded-lg border border-white/25 flex flex-col justify-between space-y-3">
+                <div class="border-2 border-[#f87171] bg-[#1a3626] p-2.5 rounded">
+                  <p id="boardSummary" class="text-xs text-[#fef08a] font-bold leading-relaxed whitespace-pre-line"></p>
+                </div>
+                <div class="text-xs text-white whitespace-pre-line border-t border-white/20 pt-2" id="boardRightContent"></div>
+              </div>
+            </div>
+
+            <!-- チョーク置き場＆黒板消し -->
+            <div class="blackboard-tray">
+              <div class="chalk-white"></div>
+              <div class="chalk-yellow"></div>
+              <div class="chalk-eraser"></div>
+            </div>
+          </div>
+        </article>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- トースト通知 -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-bold border border-slate-700">
+    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+    <span id="toastMessage">コピーしました！</span>
+  </div>
+
+  <!-- ファイル共有モーダル（PDF添付案内） -->
+  <div id="shareModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm px-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl transform transition-all">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="text-lg font-bold text-slate-800">ファイルの共有について</h3>
+        <button id="closeModalBtnTop" class="text-slate-400 hover:text-slate-600 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <p class="text-sm text-slate-600 mb-4 leading-relaxed">
+        お使いのブラウザや環境では、アプリから直接ファイルを送信する機能がサポートされていません。
+      </p>
+      <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs p-3.5 rounded-xl mb-5 leading-relaxed font-bold">
+        お手数ですが、画面上部の「印刷 / PDF」ボタンを押して一度パソコン等にPDFファイルをダウンロードし、それをメールやチャットツールに添付して先生方へ共有してください。
+      </div>
+      <div class="text-right">
+        <button id="closeModalBtn" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-bold transition">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==========================================
+    // 1. プリセットサンプルデータ（ごんぎつね・あまりのあるわり算）
+    // ==========================================
+    const PRESET_SAMPLES = [
+      {
+        grade: "小学4年",
+        subject: "国語",
+        textbook: "光村図書",
+        unit: "ごんぎつね",
+        lessonTime: "4/10時間",
+        theme: "第3場面におけるごんの行動や会話、情景描写に着目し、償いを続けるごんの気持ちの変化と兵十との心のすれ違いを叙述をもとに読み取ることができる。",
+        considerations: ["GIGA端末（Chromebook）活用", "ペア・グループ対話", "視覚支援・ユニバーサルデザイン（UDL）"],
+        plan: {
+          curriculumRef: "小学校学習指導要領（平成29年告示）国語科 第3学年及び第4学年「C 読むこと (1) エ（登場人物の気持ちの変化や性格、情景について、場面の移り変わりと結び付けて具体的に想像すること）」および光村図書「国語 四 下 かがやき」の単元構成に基づく授業。",
+          unitGoal: "場面の移り変わりと結び付けて、登場人物の気持ちの変化や性格、情景を叙述をもとに具体的に想像し、自分の考えや感想を伝え合う力を養う。",
+          unitPlan: [
+            { step: "第一次（1〜2時）", content: "全文を通読し、物語のあらすじと場面分け（第1〜6場面）を確認して学習課題を設定する。", focus: "知識・技能", isCurrent: false },
+            { step: "第二次（3時）", content: "第1・2場面を読み、いたずら好きなごんがうなぎの件を後悔し、いわしを投げ入れる心情の変化を捉える。", focus: "思考・判断・表現", isCurrent: false },
+            { step: "第二次（4時・本時）", content: "【本時】第3場面の栗やまつたけを届ける行動と、加助・兵十の会話から、ごんの心情と心のすれ違いを読み取る。", focus: "思考・判断・表現", isCurrent: true },
+            { step: "第二次（5〜7時）", content: "第4〜6場面を読み、ごんの償いへの思いとラストシーンの情景描写・二人の心の通い合いを深く味わう。", focus: "思考・判断・表現", isCurrent: false },
+            { step: "第三次（8〜10時）", content: "物語全体を通して心に残った場面やごん・兵十への思いをまとめ、読書発表会を行う。", focus: "主体的に学習", isCurrent: false }
+          ],
+          objective: "第3場面におけるごんの行動や会話、情景描写に着目し、償いを続けるごんの気持ちの変化と兵十との心のすれ違いを叙述をもとに読み取ることができる。",
+          pillars: {
+            knowledge: "場面の移り変わりを表す言葉や、心情を表す行動・情景の叙述に着目して読むことを理解する。",
+            thinking: "栗やまつたけを届けるごんの行動と、加助や兵十の会話の叙述を結び付けて心情の変化を想像し、説明する。",
+            attitude: "叙述を根拠にしながら、友達の読み取りと自分の考えを比べて積極的に読みを深めようとする。"
+          },
+          evaluations: [
+            { criterion: "知識・技能", standard: "心情を表す行動描写や会話文にサイドラインを引き、文脈に即して意味を捉えている。", method: "教科書の書き込み・ワークシート" },
+            { criterion: "思考・判断・表現", standard: "第3場面の叙述を根拠に挙げながら、ごんの気持ちと兵十とのすれ違いを具体的に説明している。", method: "発言観察・ノート記述" },
+            { criterion: "主体的に学習に取り組む態度", standard: "ペアや全体の対話を通して友達の読み取りのよさに気づき、自分の考えを深めようとしている。", method: "振り返りシート" }
+          ],
+          timeline: [
+            {
+              phase: "導入\n（5分）",
+              activity: "1. 第1・2場面のごんの行動を振り返り、第3場面を音読して本時の課題をつかむ。\nC：いわしで失敗したごんが、今度は栗やまつたけを運んでいるぞ。",
+              teacherSupport: "T：場面の移り変わりを確認し、「栗やまつたけを届けるごんの気持ち」に焦点を当ててめあてを設定する。\n【評価】第3場面の学習課題を見通している。",
+              supportBase: "【見通しが持てない】\n黒板の左端に今日の流れ（①音読→②線を引く→③シートに書く→④話し合う）を番号カードで掲示し、見通しを持たせる。",
+              supportExtra: "【見通しが持てない・気持ちの切り替えが難しい】\n前時までのあらすじを3枚のイラストカード（うなぎ→いわし→栗）で視覚的に提示して1分で切り替えられるようにする。音読は教師の後に続く追い読みも選択可とする。"
+            },
+            {
+              phase: "展開①\n（15分）",
+              activity: "2. 教科書にサイドラインを引きながら、ごんの行動・独り言と兵十たちの会話を対比して読み取る。\nC：「引きあわないなあ」と言いながらも、次の日も栗を持っていくのはなぜだろう？",
+              teacherSupport: "T：ごんの視点と兵十・加助の視点を整理するワークシートを配布し、叙述を根拠に考えさせる。\n【評価】根拠となる叙述を抜き出している（知・技）。",
+              supportBase: "【読み取りが難しい】\nごんの行動を絵カードで順番に並べるとともに、教科書の探す範囲を「P.○の3行目〜12行目」と行番号で具体的に区切って提示する。",
+              supportExtra: "【読み取りが難しい・書くことが苦手】\n文節ごとにスラッシュを入れた拡大本文シートを配布する。記述が難しい場合は、ワークシートの気持ち選択肢から丸をつける形でも可とする。"
+            },
+            {
+              phase: "展開②\n（15分）",
+              activity: "3. ペア・全体で意見交流し、ごんの思いと兵十との「すれ違い」について話し合う。\nC：兵十が「神様のしわざ」と言っていても、ごんは兵十を元気づけたくて続けているんだ！",
+              teacherSupport: "T：児童の発言を黒板中央で「ごんの思い」と「兵十の思い」に構造化して板書し、切なさや優しさに気づかせる。\n【評価】叙述をもとに心情を説明している（思・判・表）。",
+              supportBase: "【注意が続きにくい】\nペア交流の時間を「2分間」とタイマーで区切り、「まずは線引いた場所を1つ指さそう」と指示を1つずつ短く出す。",
+              supportExtra: "【注意が続きにくい・人前での発言不安】\n話し合いの前に「誰の意見に似ているかハンドサイン（1・2・3）で示そう」と全員参加の場面を作る。発表時はワークシートをそのまま実物投影機で映して指さし説明できるよう支援する。"
+            },
+            {
+              phase: "まとめ\n（10分）",
+              activity: "4. 本時のまとめを行い、ワークシートに学習の振り返りを書く。\nC：ごんは名前を知られなくても、兵十のために償いを続けていることが分かった。",
+              teacherSupport: "T：めあてに正対したまとめを赤枠で板書し、次時（第4場面）への期待をもたせる。\n【評価】自らの読みの深まりを振り返っている（態度）。",
+              supportBase: "【書くことが苦手】\n黒板の赤枠のまとめを視写する時間を確保し、振り返りは「一番心に残った言葉を1つ書き写す」だけでも合格とする。",
+              supportExtra: "【書くことが苦手・時間内に終わらない】\nまとめの穴埋め短冊（シール）を用意し、時間内に書き終えられない児童も達成感を持って授業を終えられるようにする。"
+            }
+          ],
+          worksheet: {
+            title: "4年国語「ごんぎつね」第3場面 読み取りワークシート",
+            goal: "第3場面のごんの気持ちと、兵十とのすれ違いを読み取ろう。",
+            questions: [
+              {
+                num: "1",
+                prompt: "第3場面で、ごんが兵十のためにしたことを教科書から見つけて書きましょう。",
+                choices: ["栗やまつたけを毎日運んだ", "うなぎをまた捕まえてきた", "兵十に直接あやまりに行った"],
+                lines: 2
+              },
+              {
+                num: "2",
+                prompt: "兵十と加助の会話をこっそり聞いていたごんは、「引きあわないなあ」と言いながらも次の日も栗を運びました。ごんはどんな気持ちだったでしょうか。",
+                choices: ["自分のことだと気づかれず少しさびしい気持ち", "お礼を言われなくても、兵十が元気になってうれしい気持ち", "「神様のしわざ」と言われて、もっと続けようと決意する気持ち"],
+                lines: 3
+              },
+              {
+                num: "3",
+                prompt: "【今日のまとめ・ふりかえり】この場面の「ごん」と「兵十」の心のすれ違いについて、気づいたことを書きましょう。",
+                choices: [],
+                lines: 3
+              }
+            ],
+            hints: [
+              "教科書の第3場面で「ごんがしたこと」の文の終わりに青線を引いてから書こう。",
+              "質問2は、まず上の3つの選択肢から一番近いものに○をつけて、その後に「なぜなら〜」と理由を書くと書きやすいよ。",
+              "「ごんは〜と思っているけれど、兵十は〜と思い込んでいる」の形を使うとまとめやすいよ。"
+            ]
+          },
+          board: {
+            dateTitle: "〇月〇日（　） 国語「ごんぎつね」（4/10時間）",
+            goal: "第3場面のごんの気持ちと、兵十とのすれ違いを読み取ろう。",
+            leftContent: "【第1・2場面】\n・うなぎのつぐないに、いわしを投げ入れる。\n・兵十はぬすびとだと思いこむ。\n\n【本時の課題（第3場面）】\n栗やまつたけを届けるごんの気持ちは？",
+            leftNote: "💡 視点：ごんの行動・会話 ／ 兵十と加助の会話",
+            centerContent: "【ごんの行動と心情（白）】　　　【兵十の思い（白）】\n・「おれと おなじ ひとりぼっちか」　・「毎日栗やまつたけが\n　→ 兵十への同情・後悔の深まり　　　置いてあるぞ」\n・「引きあわないなあ」　　　　　　・加助と相談し\n　→ 名前を知られないさびしさ　　　「神様のしわざだ！」\n・それでも次の日も栗を届ける　　　・ごんだとは夢にも\n　→ 見返りを求めないつぐない　　　　思わない",
+            centerHighlight: "★ 発見（黄）：ごんは「つぐない」を続けるが、兵十は「神様のしわざ」と思いすれ違う！",
+            summary: "【まとめ】\n第3場面では、兵十のために栗を届け続けるごんのやさしい気持ちと、それを知らない兵十との心のすれ違いが深まっている。",
+            rightContent: "【ふりかえり】\n・一番心に残った叙述は？\n・第4場面では二人の関係はどうなるかな？"
+          }
+        }
+      },
+      {
+        grade: "小学3年",
+        subject: "算数",
+        textbook: "啓林館",
+        unit: "あまりのあるわり算",
+        lessonTime: "3/10時間",
+        theme: "あまりの大きさは、いつもわる数より小さくなることに気づき、計算の確かめができる。",
+        considerations: ["GIGA端末（Chromebook）活用", "ペア・グループ対話", "視覚支援・ユニバーサルデザイン（UDL）"],
+        plan: {
+          curriculumRef: "小学校学習指導要領（平成29年告示）算数科 第3学年「A 数と計算 (4) 除法」の指導事項（除数と余りの大きさの関係）および啓林館「わくわく算数3」単元構成を参照。",
+          unitGoal: "あまりのあるわり算の意味や計算の仕方を理解し、九九を1回適用して商とあまりを求めることができるようにするとともに、あまりの大きさとわる数の関係に着目して筋道立てて考える力を養う。",
+          unitPlan: [
+            { step: "第一次（1〜2時）", content: "あまりのあるわり算の意味を知り、図や操作を用いて立式と計算の仕方を考える。", focus: "知識・技能", isCurrent: false },
+            { step: "第二次（3時・本時）", content: "【本時】わる数とあまりの大きさの関係を調べ、「あまりはわる数より小さくなる」きまりを見いだす。", focus: "思考・判断・表現", isCurrent: true },
+            { step: "第二次（4〜6時）", content: "計算の確かめ方（わる数×商＋あまり＝わられる数）を知り、習熟を図る。", focus: "知識・技能", isCurrent: false },
+            { step: "第三次（7〜10時）", content: "あまりの処理（切り上げ・切り捨て）が必要な文章題を解決し、単元のまとめを行う。", focus: "主体的に学習", isCurrent: false }
+          ],
+          objective: "あまりの大きさに着目し、あまりはわる数より小さくなることを見いだし、具体物や図と関連付けてその理由を説明することができる。",
+          pillars: {
+            knowledge: "わり算の余りの意味と、余りがわる数より小さくなるきまりを理解する。",
+            thinking: "具体的な操作や図、式を用いてあまりの意味やきまりを多面的に考え、説明する。",
+            attitude: "進んであまりのあるわり算の計算の仕方を考えようとする。"
+          },
+          evaluations: [
+            { criterion: "知識・技能", standard: "あまりの大きさがわる数より小さくなることを理解し、正しく計算している。", method: "ワークシートの計算・記述" },
+            { criterion: "思考・判断・表現", standard: "あまりの意味について、図や言葉を用いて筋道立てて説明している。", method: "発表およびノートの記述" },
+            { criterion: "主体的に学習に取り組む態度", standard: "進んで課題を解決しようとし、自分の考えを振り返っている。", method: "学習カード・振り返りシート" }
+          ],
+          timeline: [
+            {
+              phase: "導入\n（5分）",
+              activity: "1. 23個の飴を4人で同じ数ずつ分けると、何個ずつになって何個余るか考える。\nC：23÷4の式になりそうだけど、あまりが出そうだぞ。",
+              teacherSupport: "T：実際にブロックやおはじきを操作して確かめる活動を位置付ける。\n【評価】問題の状況を捉え、課題をもっている。",
+              supportBase: "【見通しが持てない】\n問題文の大切な数字「23こ」「4人」を赤丸で囲み、4つの皿のイラストを黒板に貼って分けるイメージを持たせる。",
+              supportExtra: "【見通しが持てない・数のイメージが湧きにくい】\n実際に23個のおはじきと4枚の紙皿を机上に配り、具体物を操作しながら立式できるようにする。"
+            },
+            {
+              phase: "展開①\n（15分）",
+              activity: "2. 実際に配る活動や図を通して、商と余りを求める方法を考える。\nC：4×5＝20であと3個だから、5個ずつで3個余る！",
+              teacherSupport: "T：机間指導を行い、あまりがわる数（4）より小さくなっていることに気づかせる。\n【評価】あまりの意味を理解している（知・技）。",
+              supportBase: "【計算のつまずき・読み取りが難しい】\n九九表（4のだん）を机上に掲示し、「23を超えない一番近い答え」を指で押さえながら探せるようにする。",
+              supportExtra: "【計算手順の混乱・書字負担】\nワークシートに「4×□＝□、23－□＝□」の計算ステップ枠をあらかじめ印刷しておき、数字を入れるだけで考えられるようにする。"
+            },
+            {
+              phase: "展開②\n（15分）",
+              activity: "3. 「あまりは、いつもわる数より小さくなる」というきまりをまとめ、他の例で確かめる。\nC：ほんとだ、あまりが4になったらまだ配れるからだ！",
+              teacherSupport: "T：なぜあまりがわる数より小さくなるのか、グループで対話させ全体で共有する。\n【評価】きまりの理由を説明できている（思・判・表）。",
+              supportBase: "【注意が続きにくい】\nペア説明は「1分間ずつ交代」とタイマーで区切り、「図のあまりの部分を指さして話そう」と行動を1つに絞って指示する。",
+              supportExtra: "【注意が続きにくい・説明の組み立てが苦手】\n「もしあまりが4個だったら、4人に（あと1こずつ配れる・もう配れない）」の選択カードを示し、理由を言葉にしやすくする。"
+            },
+            {
+              phase: "まとめ\n（10分）",
+              activity: "4. 本時のまとめを行い、ワークシートの練習問題と振り返りを解く。\nC：あまり＜わる数 が大切なんだな。",
+              teacherSupport: "T：まとめを赤枠で板書し、確認の練習問題を解かせて定着を図る。\n【評価】本時の学習を振り返り、記述できている（態度）。",
+              supportBase: "【書くことが苦手】\n練習問題では、計算が終わったら必ず「あまりとわる数のどちらが小さいか」に矢印（＜）を書かせて確かめさせる。",
+              supportExtra: "【気持ちの切り替え・達成感の確保】\n練習問題は基本2問＋チャレンジ1問の構成にし、まず基本2問ができたら花丸をつけて安心感を持たせる。"
+            }
+          ],
+          worksheet: {
+            title: "3年算数「あまりのあるわり算」あまりの大きさのきまり ワークシート",
+            goal: "あまりの大きさのきまりを見つけよう。",
+            questions: [
+              {
+                num: "1",
+                prompt: "あめが23こあります。4人に同じ数ずつ分けると、1人何こになって、何こあまりますか。式と答えを書きましょう。",
+                choices: ["4×4＝16 あまり7（まだ分けられる）", "4×5＝20 あまり3（もう分けられない）"],
+                lines: 2
+              },
+              {
+                num: "2",
+                prompt: "4でわる計算で、あまりが「4」や「5」にならないのはなぜですか。理由を書きましょう。",
+                choices: ["4人に1こずつ、まだ配ることができるから", "九九の4のだんに答えがないから"],
+                lines: 2
+              },
+              {
+                num: "3",
+                prompt: "【れんしゅう・ふりかえり】27÷5 の計算をして、今日の学習で分かったことを書きましょう。",
+                choices: [],
+                lines: 2
+              }
+            ],
+            hints: [
+              "質問1は、4のだんの九九（4×1＝4、4×2＝8…）で、23より小さくて一番近い答えを見つけよう。",
+              "質問2は、上の2つの選択肢から正しい方に○をつけてから「なぜなら、4人に〜」とつなげて書こう。",
+              "計算が終わったら「あまり ＜ わる数」になっているか必ずチェックしよう！"
+            ]
+          },
+          board: {
+            dateTitle: "〇月〇日（　） 算数「あまりのあるわり算」（3/10時間）",
+            goal: "あまりの大きさのきまりを見つけよう。",
+            leftContent: "【もんだい】あめが23こあります。4人に同じ数ずつ分けると、1人何こで何こあまるかな？\n\n【式】23÷4\n・4×4＝16 あまり7？（まだ分けられる！）\n・4×5＝20 あまり3",
+            leftNote: "💡 操作のヒント：おはじき23こを4つの皿に1こずつ配ろう",
+            centerContent: "【わる数とあまりの関係（白）】\n・20÷4＝5 あまり0\n・21÷4＝5 あまり1\n・22÷4＝5 あまり2\n・23÷4＝5 あまり3\n・24÷4＝6 あまり0\n\n【気づき】\nあまり（0, 1, 2, 3） ＜ わる数（4）",
+            centerHighlight: "★ 発見（黄）：あまりがわる数と同じか大きくなると、まだ分けられる！",
+            summary: "【まとめ】\nわり算の計算では、あまりはいつもわる数よりも小さくなります。\n（あまり ＜ わる数）",
+            rightContent: "【れんしゅう】\n(1) 27÷5＝5 あまり2\n(2) 38÷6＝6 あまり2\n\n【ふりかえり】\n・あまりとわる数を比べれば計算ミスが防げる！"
+          }
+        }
+      }
+    ];
+
+    let currentLessonData = null;
+    let sampleIndex = 0;
+
+    // DOM要素
+    const lessonForm = document.getElementById('lessonForm');
+    const gradeSelect = document.getElementById('gradeSelect');
+    const subjectSelect = document.getElementById('subjectSelect');
+    const textbookSelect = document.getElementById('textbookSelect');
+    const unitInput = document.getElementById('unitInput');
+    const lessonTimeInput = document.getElementById('lessonTimeInput');
+    const themeInput = document.getElementById('themeInput');
+    const specialNeedsCheck = document.getElementById('specialNeedsCheck');
+    const generateBtn = document.getElementById('generateBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const samplePresetBtn = document.getElementById('samplePresetBtn');
+    const copyTextBtn = document.getElementById('copyTextBtn');
+    const shareLinkBtn = document.getElementById('shareLinkBtn');
+    const printBtn = document.getElementById('printBtn');
+    const loadingBox = document.getElementById('loadingBox');
+    const loadingStepText = document.getElementById('loadingStepText');
+    const lessonDocument = document.getElementById('lessonDocument');
+    const spinnerIcon = document.getElementById('spinnerIcon');
+    const shareModal = document.getElementById('shareModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const closeModalBtnTop = document.getElementById('closeModalBtnTop');
+
+    // 初期表示
+    async function initApp() {
+      // URLから共有IDを取得
+      const urlParams = new URLSearchParams(window.location.search);
+      const shareId = urlParams.get('id');
+
+      if (shareId && window.db) {
+         setLoading(true, "共有された授業案データを読み込んでいます...");
+         try {
+            await ensureAuth();
+            const docRef = window.doc(window.db, 'artifacts', window.appId, 'public', 'data', 'lessons', shareId);
+            const docSnap = await window.getDoc(docRef);
+            if (docSnap.exists()) {
+               const data = docSnap.data();
+               // フォームに値を復元
+               gradeSelect.value = data.grade;
+               subjectSelect.value = data.subject;
+               textbookSelect.value = data.textbook;
+               unitInput.value = data.unit;
+               lessonTimeInput.value = data.lessonTime;
+               if(data.theme) themeInput.value = data.theme;
+               
+               document.querySelectorAll('input[name="considerations"]').forEach(cb => {
+                  cb.checked = data.considerations.includes(cb.value);
+               });
+               
+               renderLessonPlan(
+                  data.grade,
+                  data.subject,
+                  data.textbook,
+                  data.unit,
+                  data.lessonTime,
+                  data.considerations,
+                  data.plan,
+                  "共有データ表示中",
+                  data.sources
+               );
+               showToast("共有された授業案を読み込みました！");
+               setLoading(false);
+               return; // 共有データがあれば初期サンプルはロードしない
+            }
+         } catch(e) {
+            console.error("共有データの読み込みに失敗しました", e);
+            showToast("共有データの読み込みに失敗しました");
+         }
+         setLoading(false);
+      }
+
+      // 共有IDがない、または失敗した場合はサンプルを表示
+      const initial = PRESET_SAMPLES[0];
+      renderLessonPlan(
+        initial.grade,
+        initial.subject,
+        initial.textbook,
+        initial.unit,
+        initial.lessonTime,
+        initial.considerations,
+        initial.plan,
+        "準備完了",
+        []
+      );
+    }
+
+    if (document.readyState === 'loading') {
+      window.addEventListener('DOMContentLoaded', initApp);
+    } else {
+      initApp();
+    }
+
+    // 特別支援・合理的配慮チェックボックス変更時
+    specialNeedsCheck.addEventListener('change', () => {
+      if (!currentLessonData) return;
+      const { grade, subject, textbook, unit, lessonTime, considerations, plan, statusLabel, sources } = currentLessonData;
+      renderLessonPlan(grade, subject, textbook, unit, lessonTime, considerations, plan, statusLabel, sources);
+      showToast(specialNeedsCheck.checked ? "特別支援・合理的配慮（重点強化）を表示しました" : "標準の配慮・支援表示に切り替えました");
+    });
+
+    // 表示タブ切り替え
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => {
+          b.classList.remove('bg-emerald-800', 'text-white');
+          b.classList.add('bg-slate-100', 'text-slate-700');
+        });
+        btn.classList.remove('bg-slate-100', 'text-slate-700');
+        btn.classList.add('bg-emerald-800', 'text-white');
+
+        const target = btn.dataset.filter;
+        document.querySelectorAll('.filter-section').forEach(sec => {
+          if (target === 'all' || sec.id === target) {
+            sec.classList.remove('hidden');
+          } else {
+            sec.classList.add('hidden');
+          }
+        });
+      });
+    });
+
+    // 教科変更時に教科書と古いねらいを自動調整
+    subjectSelect.addEventListener('change', () => {
+      themeInput.value = "";
+      const subj = subjectSelect.value;
+      if (subj === "国語") textbookSelect.value = "光村図書";
+      else if (subj === "算数") textbookSelect.value = "啓林館";
+      else if (subj === "社会" || subj === "理科" || subj === "生活") textbookSelect.value = "東京書籍";
+      else if (subj === "道徳") textbookSelect.value = "学研（Gakken）"; // 道徳のデフォルト例
+    });
+
+    // サンプル読込ボタン
+    samplePresetBtn.addEventListener('click', () => {
+      sampleIndex = (sampleIndex + 1) % PRESET_SAMPLES.length;
+      const sample = PRESET_SAMPLES[sampleIndex];
+      gradeSelect.value = sample.grade;
+      subjectSelect.value = sample.subject;
+      textbookSelect.value = sample.textbook;
+      unitInput.value = sample.unit;
+      lessonTimeInput.value = sample.lessonTime;
+      themeInput.value = sample.theme;
+
+      document.querySelectorAll('input[name="considerations"]').forEach(cb => {
+        cb.checked = sample.considerations.includes(cb.value);
+      });
+
+      renderLessonPlan(
+        sample.grade,
+        sample.subject,
+        sample.textbook,
+        sample.unit,
+        sample.lessonTime,
+        sample.considerations,
+        sample.plan,
+        "サンプル表示中",
+        []
+      );
+      showToast(`サンプル（${sample.grade} ${sample.subject}「${sample.unit}」）を読み込みました`);
+    });
+
+    // リセットボタン
+    resetBtn.addEventListener('click', () => {
+      unitInput.value = "";
+      lessonTimeInput.value = "1/8時間";
+      themeInput.value = "";
+      specialNeedsCheck.checked = false;
+      document.querySelectorAll('input[name="considerations"]').forEach(cb => {
+        cb.checked = false;
+      });
+      showToast("入力条件をリセットしました");
+    });
+
+    // フォーム送信
+    lessonForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const grade = gradeSelect.value;
+      const subject = subjectSelect.value;
+      const textbook = textbookSelect.value;
+      const unit = unitInput.value.trim();
+      const lessonTime = lessonTimeInput.value.trim() || "本時（45分）";
+      const theme = themeInput.value.trim();
+      const considerations = Array.from(document.querySelectorAll('input[name="considerations"]:checked')).map(cb => cb.value);
+
+      if (!unit) {
+        showToast("単元名・題材名を入力してください");
+        unitInput.focus();
+        return;
+      }
+
+      setLoading(true, `Google検索で「${textbook} ${grade} ${subject} ${unit}」の教科書単元・学習指導要領を検索中...`);
+      if (spinnerIcon) spinnerIcon.classList.remove('hidden');
+
+      try {
+        const researchResult = await researchTextbookAndCurriculum(grade, subject, textbook, unit, lessonTime);
+        setLoading(true, "検索結果をもとに、配慮・支援、A4ワークシート、黒板図解を構築中...");
+
+        const plan = await generateStructuredLessonPlan(grade, subject, textbook, unit, lessonTime, theme, considerations, researchResult.summary);
+
+        renderLessonPlan(grade, subject, textbook, unit, lessonTime, considerations, plan, "教科書検索・AI生成完了", researchResult.sources);
+        showToast("授業案・配慮支援・ワークシート・板書計画を生成しました！");
+      } catch (err) {
+        // エラー時は強力なスマートフォールバックを使用
+        const fallbackPlan = createSmartFallbackPlan(grade, subject, textbook, unit, lessonTime, theme, considerations);
+        renderLessonPlan(grade, subject, textbook, unit, lessonTime, considerations, fallbackPlan, "標準生成完了", []);
+        showToast("授業案・配慮支援・ワークシート・板書計画を作成しました！");
+      } finally {
+        setLoading(false);
+        if (spinnerIcon) spinnerIcon.classList.add('hidden');
+      }
+    });
+
+    // ==========================================
+    // 2. Step 1: Google Search で教科書・学習指導要領をリサーチ
+    // ==========================================
+    async function researchTextbookAndCurriculum(grade, subject, textbook, unit, lessonTime) {
+      const apiKey = "";
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+      const queryPrompt = `日本の小学校の${grade}・${subject}（教科書会社：${textbook}）の単元『${unit}』について、Google検索を用いて正確な学習内容を徹底的に調査してください。
+以下の情報を必ず含めて詳細なレポートを作成してください：
+1. ${textbook}の教科書における『${unit}』の実際の教材内容。
+   ※国語や道徳の場合、あらすじ、登場人物の正確な名前、場面ごとの心情変化を必ず特定すること。
+   ※道徳の場合、扱う「主題名」「内容項目（道徳的価値）」を明確にすること。
+2. 文部科学省「小学校学習指導要領（平成29年告示）」における該当学年・領域・指導事項。
+3. 学習の流れ（単元全体の構成）と、その中で「${lessonTime}」に該当する時間における具体的な学習活動。
+4. 児童がつまずきやすいポイントと、教師が行うべき重要な発問や支援・評価規準。`;
+
+      const payload = {
+        contents: [{ parts: [{ text: queryPrompt }] }],
+        tools: [{ "google_search": {} }],
+        systemInstruction: {
+          parts: [{ text: "あなたは日本の小学校教育・教科書研究の専門家です。Google検索を用いて実際の教科書会社（光村図書、東京書籍、啓林館、教育出版、Gakken等）の単元構成や教材の具体的な場面・登場人物の名前・あらすじ・主題・道徳的価値、および学習指導要領の指導事項を徹底的に正確に調査してください。推測ではなく、教科書の事実に基づいた回答をしてください。" }]
+        }
+      };
+
+      const response = await fetchWithRetry(apiUrl, payload);
+      const result = await response.json();
+      const candidate = result?.candidates?.[0];
+      const summary = candidate?.content?.parts?.[0]?.text || "";
+
+      let sources = [];
+      const attributions = candidate?.groundingMetadata?.groundingAttributions || [];
+      sources = attributions
+        .map(attr => ({ uri: attr.web?.uri, title: attr.web?.title }))
+        .filter(s => s.uri && s.title);
+
+      const uniqueSources = [];
+      const seenUris = new Set();
+      for (const s of sources) {
+        if (!seenUris.has(s.uri)) {
+          seenUris.add(s.uri);
+          uniqueSources.push(s);
+        }
+      }
+
+      return { summary, sources: uniqueSources.slice(0, 4) };
+    }
+
+    // ==========================================
+    // 3. Step 2: 検索結果をもとに構造化指導案・配慮支援・ワークシート・板書計画を生成
+    // ==========================================
+    async function generateStructuredLessonPlan(grade, subject, textbook, unit, lessonTime, theme, considerations, researchSummary) {
+      const apiKey = "";
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+
+      const systemPrompt = `あなたは日本の小学校教育と特別支援教育・ユニバーサルデザイン（UDL）に精通した授業研究の専門家です。
+提供された【教科書・学習指導要領の調査結果】を最大限に活用し、指定された【教科：${subject}】【学年：${grade}】【教科書：${textbook}】【単元名：${unit}】に完全に合致した単元計画・本時授業案（全段階の配慮・支援つき）・A4ワークシート・黒板板書計画を作成してください。
+※必ず以下のJSON形式のオブジェクトのみを返してください。`;
+
+      const userPrompt = `【教科書・学習指導要領の調査結果】
+${researchSummary}
+
+【作成条件】
+- 学年：${grade}
+- 教科・領域：${subject}
+- 使用教科書：${textbook}
+- 単元名・題材名（教材名）：${unit}
+- 本時の時間：${lessonTime}
+- 本時のねらい・テーマ：${theme ? theme : `調査結果に基づき、単元『${unit}』の「${lessonTime}」に最もふさわしい本時のねらいを設定してください`}
+- 授業の工夫・ICT活用：${considerations.length > 0 ? considerations.join("、") : "標準"}
+
+重要事項：
+- 登場人物名、地名、扱う数値、用語などの固有名詞や内容は、調査結果（実際の教科書）の情報を絶対にそのまま使用すること。AIが勝手に創作した名前を使用しないこと。
+- 教科が「道徳」の場合は、検索結果の「主題名」「内容項目」を必ず記載し、登場人物の心情の変化や道徳的価値の自覚を深める発問・話し合いを含めてください。
+
+【出力JSONフォーマット（必ずこの構造のJSONオブジェクトを返すこと）】
+{
+  "curriculumRef": "学習指導要領と教科書の該当事項",
+  "unitGoal": "単元（または本時）全体の目標",
+  "unitPlan": [
+    { "step": "第一次（1〜2時）", "content": "活動内容", "focus": "知識・技能など", "isCurrent": false }
+  ],
+  "objective": "本時の目標",
+  "pillars": {
+    "knowledge": "知識・技能の柱（道徳なら道徳的価値の理解）",
+    "thinking": "思考・判断・表現の柱（道徳なら多面的・多角的な思考）",
+    "attitude": "主体的に学習に取り組む態度の柱（道徳なら自己を見つめる）"
+  },
+  "evaluations": [
+    { "criterion": "観点名", "standard": "B基準の具体例", "method": "見取り方法" }
+  ],
+  "timeline": [
+    {
+      "phase": "導入\\n（5分）",
+      "activity": "学習活動と児童の反応",
+      "teacherSupport": "教師の支援・発問",
+      "supportBase": "【見通しが持てない】具体的な支援の手立て",
+      "supportExtra": "【重点合理的配慮】具体的な代替手段"
+    }
+  ],
+  "worksheet": {
+    "title": "ワークシートタイトル",
+    "goal": "きょうのめあて",
+    "questions": [
+      { "num": "1", "prompt": "設問文", "choices": ["選択肢1", "選択肢2"], "lines": 2 }
+    ],
+    "hints": ["ヒント1", "ヒント2"]
+  },
+  "board": {
+    "dateTitle": "〇月〇日 授業タイトル",
+    "goal": "めあて",
+    "leftContent": "左側板書内容",
+    "leftNote": "左側のメモ",
+    "centerContent": "中央板書内容",
+    "centerHighlight": "中央の重要な発見（黄）",
+    "summary": "まとめ（赤枠）",
+    "rightContent": "右側の内容"
+  }
+}`;
+
+      const payload = {
+        contents: [{ parts: [{ text: userPrompt }] }],
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      };
+
+      try {
+        const response = await fetchWithRetry(apiUrl, payload);
+        const result = await response.json();
+        const rawText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawText) throw new Error("Empty structured response");
+        return JSON.parse(rawText);
+      } catch (err) {
+        return createSmartFallbackPlan(grade, subject, textbook, unit, lessonTime, theme, considerations);
+      }
+    }
+
+    async function fetchWithRetry(apiUrl, payload) {
+      let lastError;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const controller = new AbortController();
+        // タイムアウトを40秒に延長（AI検索・生成に時間がかかる道徳等でのエラーを防ぐ）
+        const timeoutId = setTimeout(() => controller.abort(), 40000); 
+        try {
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response;
+        } catch (err) {
+          clearTimeout(timeoutId);
+          lastError = err;
+          await new Promise(res => setTimeout(res, 400));
+        }
+      }
+      throw lastError;
+    }
+    
+    // ==========================================
+    // 共有機能（クラウド保存）用ヘルパー関数
+    // ==========================================
+    async function ensureAuth() {
+        if (!window.auth) return;
+        if (!window.auth.currentUser) {
+            if (window.initialAuthToken) {
+                await window.signInWithCustomToken(window.auth, window.initialAuthToken);
+            } else {
+                await window.signInAnonymously(window.auth);
+            }
+        }
+    }
+
+    // ==========================================
+    // 4. 教科別スマートフォールバック生成
+    // ==========================================
+    function createSmartFallbackPlan(grade, subject, textbook, unit, lessonTime, theme, considerations) {
+      if (subject === "国語" && unit.includes("ごんぎつね") && !theme) return PRESET_SAMPLES[0].plan;
+      if (subject === "算数" && unit.includes("あまりのあるわり算") && !theme) return PRESET_SAMPLES[1].plan;
+
+      // --- 道徳の特別フォールバック ---
+      if (subject === "道徳") {
+        const resolvedThemeDoutoku = theme || `教材『${unit}』を通して、登場人物の心情を考え、自らの生き方について考えを深める。`;
+        return {
+          curriculumRef: `小学校学習指導要領（平成29年告示）${grade}「特別の教科 道徳」および${textbook}の教材『${unit}』に基づく授業。`,
+          unitGoal: `教材『${unit}』を通して、道徳的価値についての理解を深め、自己を見つめ、物事を多面的・多角的に考え、自己の生き方についての考えを深める。`,
+          unitPlan: [
+            { step: "本時（1/1時）", content: `教材『${unit}』を読み、登場人物の行動や気持ちを通して、ねらいとする道徳的価値について考えを深める。`, focus: "価値の理解・自己を見つめる", isCurrent: true }
+          ],
+          objective: resolvedThemeDoutoku,
+          pillars: {
+            knowledge: `ねらいとする道徳的価値について、その大切さを理解する。`,
+            thinking: `登場人物の気持ちや行動について、多面的・多角的に考える。`,
+            attitude: `学んだことをこれからの自分の生活や生き方に生かそうとする。`
+          },
+          evaluations: [
+            { criterion: "道徳的価値の理解", standard: "教材を通して、道徳的価値のよさや大切さについて気付いている。", method: "発言・ワークシート" },
+            { criterion: "多面的・多角的な思考", standard: "登場人物の立場になり、それぞれの思いや考えを想像して表現している。", method: "対話・発表" },
+            { criterion: "自己を見つめる", standard: "学習を通して自己の経験やこれからの生き方について考えを深めている。", method: "振り返り記述" }
+          ],
+          timeline: [
+            {
+              phase: "導入\n（5分）",
+              activity: `1. 本時の主題に関する身近な経験を振り返り、学習課題をつかむ。\nC：こんな経験があったな。`,
+              teacherSupport: `T：児童の経験を引き出し、本時のめあてを設定する。\n【評価】学習への関心・意欲をもっている。`,
+              supportBase: "【見通しが持てない】\n黒板の左側に今日の流れ（①読む→②話し合う→③ふりかえる）を番号カードで掲示する。",
+              supportExtra: "【見通しが持てない・経験の想起が難しい】\n具体的な場面のイラストを提示し、「こんなときどうする？」と二者択一で選ばせて関心を高める。"
+            },
+            {
+              phase: "展開①\n（20分）",
+              activity: `2. 教材『${unit}』を読み、主な登場人物の行動や気持ちの変化について考える。\nC：登場人物は、このときどんな気持ちだったのだろう。`,
+              teacherSupport: `T：中心となる場面で、「なぜこのような行動をとったのか」を問う発問を行う。\n【評価】登場人物の心情を多面的に考えている。`,
+              supportBase: "【読み取りが難しい】\n挿絵や役割演技を取り入れ、具体的な場面をイメージしやすくする。",
+              supportExtra: "【読み取りが難しい・心情理解が苦手】\n気持ちを表す「表情カード」を渡し、登場人物の気持ちの変化に合わせてカードを選ばせる。"
+            },
+            {
+              phase: "展開②\n（10分）",
+              activity: `3. 登場人物の思いを通して、ねらいとする道徳的価値について話し合う。\nC：本当のよさや大切さってどういうことだろう。`,
+              teacherSupport: `T：話し合いを通して、道徳的価値を自分たちの問題として捉え直させる。\n【評価】価値について考えを深めている。`,
+              supportBase: "【注意が続きにくい】\nグループ話し合いでは参加しやすくなるよう、短い時間（2分など）で区切る。",
+              supportExtra: "【話し合いが苦手】\nホワイトボードに自分の意見を書いた付箋を貼り、それを見ながら話すことで発言のハードルを下げる。"
+            },
+            {
+              phase: "終末\n（10分）",
+              activity: `4. 学習を振り返り、これからの自分の生活にどう生かしていくかワークシートに書く。\nC：これからは〇〇していきたい。`,
+              teacherSupport: `T：教師の説話を通して価値への思いをさらに深め、授業をまとめる。\n【評価】自己を見つめ、今後の生活に生かそうとしている。`,
+              supportBase: "【書くことが苦手】\n振り返りの視点を「心に残ったこと」「これからやってみたいこと」と明確にする。",
+              supportExtra: "【書くことが苦手】\n振り返りの「書き出しの言葉」や「選択肢」を用意し、自分の思いを表現しやすくする。"
+            }
+          ],
+          worksheet: {
+            title: `${grade}道徳「${unit}」学習シート`,
+            goal: resolvedThemeDoutoku,
+            questions: [
+              {
+                num: "1",
+                prompt: `お話のいちばん大切な場面で、登場人物はどんなことを考えていたと思いますか。`,
+                choices: [],
+                lines: 3
+              },
+              {
+                num: "2",
+                prompt: `このお話を通して、どんなことが大切だと思いましたか。`,
+                choices: [],
+                lines: 3
+              },
+              {
+                num: "3",
+                prompt: `【ふりかえり】今日の学習を通して、これからの自分の生活で生かしたいことや、やってみたいことを書きましょう。`,
+                choices: [],
+                lines: 3
+              }
+            ],
+            hints: [
+              "登場人物の行動や言った言葉に注目して、気持ちを想像してみよう。",
+              "これまでの自分の経験と比べてみると書きやすいよ。"
+            ]
+          },
+          board: {
+            dateTitle: `〇月〇日（　） 道徳「${unit}」`,
+            goal: `登場人物の姿から、大切なことについて考えよう。`,
+            leftContent: `【ふりかえり】\n（これまでの経験など）\n\n【お話のあらすじ】\n・\n・`,
+            leftNote: "💡 視点：自分だったらどうするかな？",
+            centerContent: "【登場人物の気持ち（白）】\n・はじめの気持ち\n\n・できごとのあとの気持ち\n\n【話し合い（白）】\n・一番大切にしたかった思いは何だろう？",
+            centerHighlight: "★ 気づき（黄）：本当の〇〇とは、～することだ！",
+            summary: `【まとめ】\n『${unit}』の学習を通して、～することの大切さに気付いた。`,
+            rightContent: "【わたしのふりかえり】\n・これからは～していきたい。\n\n（教師の説話）"
+          }
+        };
+      }
+
+      // --- 通常教科のフォールバック ---
+      const resolvedTheme = theme || `『${unit}』の学習を通して、根拠をもとに自分の考えをまとめ、伝え合うことができる。`;
+      return {
+        curriculumRef: `小学校学習指導要領（平成29年告示）${grade}「${subject}」および${textbook}の単元『${unit}』の指導事項に基づく授業。`,
+        unitGoal: `『${unit}』の基礎的・基本的な知識及び技能を習得するとともに、既習事項と関連付けて課題を解決する思考力・判断力・表現力を養う。`,
+        unitPlan: [
+          { step: "第一次（導入・基礎）", content: `『${unit}』の学習課題をつかみ、基本的な考え方や技能を身につける。`, focus: "知識・技能", isCurrent: false },
+          { step: `第二次（${lessonTime}・本時）`, content: `【本時】${resolvedTheme}`, focus: "思考・判断・表現", isCurrent: true },
+          { step: "第三次（発展・まとめ）", content: `学んだことを活用して発展的な課題に取り組み、単元の振り返りを行う。`, focus: "主体的に学習", isCurrent: false }
+        ],
+        objective: resolvedTheme,
+        pillars: {
+          knowledge: `『${unit}』に関する基礎的な知識・技能を身につける。`,
+          thinking: `具体例や既習事項をもとに、筋道立てて考え表現する。`,
+          attitude: `意欲的に課題に関わり、互いの考えを認め合おうとする。`
+        },
+        evaluations: [
+          { criterion: "知識・技能", standard: "学習内容を理解し、正しく処理・表現できる。", method: "ノート確認・ワークシート" },
+          { criterion: "思考・判断・表現", standard: "根拠を明らかにしながら分かりやすく説明している。", method: "発言観察および提出物確認" },
+          { criterion: "主体的に学習に取り組む態度", standard: "主体的に考えをもち、振り返りを行っている。", method: "授業中の様子と振り返り記述" }
+        ],
+        timeline: [
+          {
+            phase: "導入\n（5分）",
+            activity: `1. 教科書の導入場面を確認し、本時の課題をつかむ。\nC：既習の考え方を使えば解決できそうだ。`,
+            teacherSupport: `T：前時までの学習とつなげながら、本時のめあてを設定する。\n【評価】学習に関心をもっている。`,
+            supportBase: "【見通しが持てない】\n黒板の左側に今日の流れを番号カードで掲示する。",
+            supportExtra: "【見通しが持てない・気持ちの切り替えが難しい】\n前時の要点カードを1分間提示して視覚的に振り返ってから、本時のページ番号を黒板に大きく書いて切り替える。"
+          },
+          {
+            phase: "展開①\n（15分）",
+            activity: `2. 教科書や資料から根拠となる部分に印をつけ、ワークシートに自分の考えをまとめる。\nC：図や言葉を使って理由も書いてみよう。`,
+            teacherSupport: `T：机間指導でつまずきを把握し、着目すべき箇所を助言する。\n【評価】自力で表現している（知・技）。`,
+            supportBase: "【読み取りが難しい】\n教科書の探す範囲を「P.○の図（または段落）」と具体的に区切り、大切な言葉に色鉛筆で線を引かせる。",
+            supportExtra: "【読み取りが難しい・書くことが苦手】\n注目箇所を拡大したシートを配布する。記述が難しい場合は、ワークシートの選択肢に丸をつけてから一言理由を添える形にする。"
+          },
+          {
+            phase: "展開②\n（15分）",
+            activity: `3. ペアや全体で考えを交流し、共通点や大切なポイントを見いだす。\nC：〇〇さんの考え方と比べると、大切なポイントが見えてきた！`,
+            teacherSupport: `T：児童の反応を分類して板書し、根拠を問う発問を行う。\n【評価】対話を通して深めている（思・判・表）。`,
+            supportBase: "【注意が続きにくい】\nペア交流は「2分間」とタイマーで区切り、「まずは印をつけた場所を1つ指さして見せ合おう」と指示を1つずつ短く出す。",
+            supportExtra: "【注意が続きにくい・人前での発言不安】\n話す順番（Aさん→Bさん）を事前に決め、発表時はワークシートをそのまま実物投影機で映して指さし説明できるようにする。"
+          },
+          {
+            phase: "まとめ\n（10分）",
+            activity: `4. 本時のまとめを行い、ワークシートに振り返りを書く。\nC：今日のまとめを使って練習問題も解けた。`,
+            teacherSupport: `T：めあてに正対したまとめを赤枠で板書し、定着を確認する。\n【評価】学びを振り返っている（態度）。`,
+            supportBase: "【書くことが苦手】\n黒板の赤枠のまとめを写す時間を確保し、振り返りは「今日一番大切だと思った言葉を1つ書き写す」だけでも合格とする。",
+            supportExtra: "【書くことが苦手・時間内に終わらない】\nまとめの穴埋めプリント（またはシール）を用意し、時間内に書き終えられない児童も達成感を持って授業を終えられるようにする。"
+          }
+        ],
+        worksheet: {
+          title: `${grade}${subject}「${unit}」学習ワークシート`,
+          goal: resolvedTheme,
+          questions: [
+            {
+              num: "1",
+              prompt: `教科書や資料から、「${unit}」について大切な言葉や事実を抜き出しましょう。`,
+              choices: ["教科書の太字・キーワードに注目する", "図や写真・表の変化に注目する", "登場人物や資料の理由に注目する"],
+              lines: 2
+            },
+            {
+              num: "2",
+              prompt: `1で見つけたことをもとに、自分の考えと理由を書きましょう。`,
+              choices: [],
+              lines: 3
+            },
+            {
+              num: "3",
+              prompt: `【今日のまとめ・ふりかえり】友達の意見も聞いて、新しく気づいたことや分かったことを書きましょう。`,
+              choices: [],
+              lines: 3
+            }
+          ],
+          hints: [
+            "まずは教科書や資料の大切なところに色鉛筆で線を引いてから書き始めよう。",
+            "質問2は「わたしは〜だと思います。なぜなら、〜だからです。」の型を使うと書きやすいよ。",
+            "迷ったら、黒板の黄色チョークで書かれたヒントを見てみよう。"
+          ]
+        },
+        board: {
+          dateTitle: `〇月〇日（　） ${subject}「${unit}」（${lessonTime}）`,
+          goal: `${unit}の大切なポイントを根拠をもとに見つけよう！`,
+          leftContent: `【もんだい・課題】\n教科書の課題を確認しよう。\n\n【既習事項】\nこれまでに学んだこと`,
+          leftNote: "💡 視点：どこに着目すればよいかな？",
+          centerContent: "【みんなの考え（白）】\n① 自分の考え（図・式・言葉）\n② 友達の考えとの共通点・違い\n\n【わかったこと（白）】\n共通する大切なきまり・理由",
+          centerHighlight: "★ 発見（黄）：根拠と理由を結びつけると分かりやすく説明できる！",
+          summary: `【まとめ】\n『${unit}』では、根拠をもとに筋道立てて考えることが大切である。`,
+          rightContent: "【れんしゅう・適用】\n教科書の練習問題に取り組もう\n\n【ふりかえり】\n・新しく分かったこと\n・友達の考えのよさ"
+        }
+      };
+    }
+
+    // ==========================================
+    // 5. 画面レンダリング関数
+    // ==========================================
+    function renderLessonPlan(grade, subject, textbook, unit, lessonTime, considerations, plan, statusLabel, sources) {
+      currentLessonData = { grade, subject, textbook, unit, lessonTime, considerations, plan, statusLabel, sources };
+      const isSpecialNeeds = specialNeedsCheck.checked;
+
+      const modeIndicatorEl = document.getElementById('modeIndicator');
+      if (modeIndicatorEl) modeIndicatorEl.textContent = statusLabel;
+
+      document.getElementById('outGradeBadge').textContent = grade;
+      document.getElementById('outSubjectBadge').textContent = subject;
+      const tbBadge = document.getElementById('outTextbookBadge');
+      if (tbBadge) tbBadge.textContent = textbook;
+      document.getElementById('outUnitTitle').textContent = `単元名：${unit}`;
+      document.getElementById('outLessonTimeBadge').textContent = `本時：${lessonTime}`;
+
+      const spBadge = document.getElementById('outSpecialNeedsBadge');
+      if (spBadge) {
+        if (isSpecialNeeds) spBadge.classList.remove('hidden');
+        else spBadge.classList.add('hidden');
+      }
+
+      const considerationsEl = document.getElementById('outConsiderations');
+      considerationsEl.innerHTML = '';
+      if (considerations && considerations.length > 0) {
+        considerations.forEach(item => {
+          const span = document.createElement('span');
+          span.className = 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-800 border border-emerald-200';
+          span.textContent = `✓ ${item}`;
+          considerationsEl.appendChild(span);
+        });
+      }
+
+      document.getElementById('outCurriculumRef').textContent = plan.curriculumRef;
+
+      // 参照Webソースの表示
+      const sourcesBox = document.getElementById('outSearchSourcesBox');
+      const sourcesList = document.getElementById('outSearchSourcesList');
+      if (sourcesBox && sourcesList) {
+        if (sources && sources.length > 0) {
+          sourcesBox.classList.remove('hidden');
+          sourcesList.innerHTML = '';
+          sources.forEach(src => {
+            const a = document.createElement('a');
+            a.href = src.uri;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.className = 'inline-flex items-center px-2 py-0.5 rounded bg-white border border-slate-200 text-emerald-700 hover:bg-emerald-50 hover:underline max-w-[220px] truncate';
+            a.textContent = src.title;
+            sourcesList.appendChild(a);
+          });
+        } else {
+          sourcesBox.classList.add('hidden');
+        }
+      }
+
+      document.getElementById('outUnitGoal').textContent = plan.unitGoal || "";
+
+      const unitPlanBody = document.getElementById('outUnitPlanBody');
+      if (unitPlanBody && plan.unitPlan) {
+        unitPlanBody.innerHTML = '';
+        plan.unitPlan.forEach(item => {
+          const tr = document.createElement('tr');
+          tr.className = item.isCurrent ? 'bg-emerald-50/80 font-bold text-emerald-950' : 'hover:bg-slate-50 text-slate-700';
+          tr.innerHTML = `
+            <td class="py-2.5 px-3 align-top whitespace-nowrap">${escapeHtml(item.step)}</td>
+            <td class="py-2.5 px-3 align-top leading-relaxed">${escapeHtml(item.content)}</td>
+            <td class="py-2.5 px-3 align-top text-center">
+              <span class="inline-block px-2 py-0.5 rounded text-[11px] bg-white border border-slate-200 text-slate-600 font-medium">${escapeHtml(item.focus)}</span>
+            </td>
+          `;
+          unitPlanBody.appendChild(tr);
+        });
+      }
+
+      document.getElementById('outObjective').textContent = plan.objective;
+      document.getElementById('outPillarKnowledge').textContent = plan.pillars.knowledge;
+      document.getElementById('outPillarThinking').textContent = plan.pillars.thinking;
+      document.getElementById('outPillarAttitude').textContent = plan.pillars.attitude;
+
+      const evalBody = document.getElementById('outEvaluationBody');
+      evalBody.innerHTML = '';
+      const badgeColors = ['bg-emerald-100 text-emerald-800', 'bg-sky-100 text-sky-800', 'bg-amber-100 text-amber-800'];
+      plan.evaluations.forEach((ev, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50/70 transition';
+        tr.innerHTML = `
+          <td class="py-3 px-3 align-top">
+            <span class="inline-block px-2 py-1 rounded-md text-xs font-bold ${badgeColors[idx % badgeColors.length]}">
+              ${escapeHtml(ev.criterion)}
+            </span>
+          </td>
+          <td class="py-3 px-3 text-slate-800 leading-relaxed align-top">${escapeHtml(ev.standard)}</td>
+          <td class="py-3 px-3 text-slate-600 leading-relaxed align-top">${escapeHtml(ev.method)}</td>
+        `;
+        evalBody.appendChild(tr);
+      });
+
+      // 45分の展開（「配慮・支援」列付き）
+      const flowBody = document.getElementById('outFlowBody');
+      flowBody.innerHTML = '';
+      plan.timeline.forEach((step) => {
+        const baseText = step.supportBase || "【見通しが持てない】\n黒板に手順を番号で示し、1つずつ指示を出す。";
+        const extraText = step.supportExtra || "";
+        const supportHtml = isSpecialNeeds && extraText
+          ? `<div class="space-y-2">
+               <div class="text-slate-800 leading-relaxed whitespace-pre-line">${escapeHtml(baseText)}</div>
+               <div class="bg-amber-100/90 border border-amber-300 rounded-lg p-2 text-amber-950 leading-relaxed whitespace-pre-line">
+                 <span class="font-bold text-amber-900 block mb-0.5">★ 重点合理的配慮：</span>${escapeHtml(extraText)}
+               </div>
+             </div>`
+          : `<div class="text-slate-800 leading-relaxed whitespace-pre-line">${escapeHtml(baseText)}</div>`;
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50/70 transition align-top';
+        tr.innerHTML = `
+          <td class="py-3 px-2 text-center font-bold text-slate-700 bg-slate-50/80 whitespace-pre-line border-r border-slate-200">${escapeHtml(step.phase)}</td>
+          <td class="py-3 px-3 text-slate-800 leading-relaxed whitespace-pre-line">${escapeHtml(step.activity)}</td>
+          <td class="py-3 px-3 text-slate-800 leading-relaxed whitespace-pre-line bg-emerald-50/20">${escapeHtml(step.teacherSupport)}${step.evaluation ? '\n' + escapeHtml(step.evaluation) : ''}</td>
+          <td class="py-3 px-3 bg-amber-50/50 border-l border-amber-200/80">${supportHtml}</td>
+        `;
+        flowBody.appendChild(tr);
+      });
+
+      // ④ 本時のワークシート描画
+      const ws = plan.worksheet || {
+        title: `${grade}${subject}「${unit}」学習ワークシート`,
+        goal: plan.objective,
+        questions: [],
+        hints: []
+      };
+      document.getElementById('wsTitle').textContent = ws.title;
+      document.getElementById('wsGradeLabel').textContent = grade.replace("小学", "") + "年";
+      document.getElementById('wsGoal').textContent = ws.goal;
+
+      const wsContainer = document.getElementById('wsQuestionsContainer');
+      wsContainer.innerHTML = '';
+      (ws.questions || []).forEach(q => {
+        const choicesHtml = (q.choices && q.choices.length > 0)
+          ? `<div class="flex flex-wrap gap-2 my-2">
+               ${q.choices.map(ch => `
+                 <span class="inline-flex items-center gap-1.5 border border-slate-400 rounded-full px-3 py-1 text-xs bg-slate-50 text-slate-800">
+                   <span class="w-3 h-3 rounded-full border border-slate-600 inline-block"></span>
+                   ${escapeHtml(ch)}
+                 </span>
+               `).join('')}
+             </div>`
+          : '';
+        const heightPx = (q.lines || 2) * 32;
+        const div = document.createElement('div');
+        div.className = 'border border-slate-400 rounded-xl p-4 break-inside-avoid mb-4';
+        div.innerHTML = `
+          <div class="flex items-start gap-2.5 mb-1.5">
+            <span class="bg-slate-800 text-white font-bold text-xs w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5">${escapeHtml(q.num)}</span>
+            <p class="font-bold text-xs sm:text-sm text-slate-900 leading-snug">${escapeHtml(q.prompt)}</p>
+          </div>
+          ${choicesHtml}
+          <div class="ruled-lines border border-slate-300 rounded-lg mt-2 px-3" style="height: ${heightPx}px;"></div>
+        `;
+        wsContainer.appendChild(div);
+      });
+
+      const wsHintsList = document.getElementById('wsHintsList');
+      wsHintsList.innerHTML = (ws.hints || []).map(h => `<li>${escapeHtml(h)}</li>`).join('');
+
+      // ⑤ 板書計画（黒板図）描画
+      document.getElementById('boardDateTitle').textContent = plan.board.dateTitle;
+      document.getElementById('boardGoal').textContent = plan.board.goal.replace(/^めあて：/, '');
+      document.getElementById('boardLeftContent').textContent = plan.board.leftContent;
+      document.getElementById('boardLeftNote').textContent = plan.board.leftNote;
+      document.getElementById('boardCenterContent').textContent = plan.board.centerContent;
+      document.getElementById('boardCenterHighlight').textContent = plan.board.centerHighlight;
+      document.getElementById('boardSummary').textContent = plan.board.summary;
+      document.getElementById('boardRightContent').textContent = plan.board.rightContent;
+    }
+
+    // ==========================================
+    // 6. コピー・印刷
+    // ==========================================
+    copyTextBtn.addEventListener('click', () => {
+      if (!currentLessonData) return;
+      const { grade, subject, textbook, unit, lessonTime, considerations, plan } = currentLessonData;
+      const isSpecialNeeds = specialNeedsCheck.checked;
+      const ws = plan.worksheet || { title: "", goal: "", questions: [], hints: [] };
+
+      const formattedText = `【小学校 学習指導案・配慮支援・ワークシート・板書計画】
+■ 学年・教科：${grade} ${subject}（教科書：${textbook}）
+■ 単元名：${unit}（本時：${lessonTime}）
+■ 特別支援・合理的配慮モード：${isSpecialNeeds ? '重点強化あり' : '標準'}
+■ 授業の工夫：${considerations.length > 0 ? considerations.join(' / ') : '標準'}
+■ 学習指導要領・教科書参照：
+${plan.curriculumRef}
+
+━━━━━━━━━━━━━━━━━━━━
+① 単元の目標と単元指導計画
+━━━━━━━━━━━━━━━━━━━━
+【単元目標】
+${plan.unitGoal || ''}
+
+【単元計画】
+${(plan.unitPlan || []).map(u => `・${u.step}：${u.content}（重点：${u.focus}）`).join('\n')}
+
+【本時の目標】
+${plan.objective}
+
+━━━━━━━━━━━━━━━━━━━━
+② 評価規準（3観点）
+━━━━━━━━━━━━━━━━━━━━
+${plan.evaluations.map(e => `【${e.criterion}】\n・B基準：${e.standard}\n・見取り：${e.method}`).join('\n\n')}
+
+━━━━━━━━━━━━━━━━━━━━
+③ 本時の展開（45分）と配慮・支援
+━━━━━━━━━━━━━━━━━━━━
+${plan.timeline.map(t => {
+  const spText = isSpecialNeeds && t.supportExtra
+    ? `${t.supportBase}\n★重点合理的配慮：${t.supportExtra}`
+    : (t.supportBase || '');
+  return `■ ${t.phase.replace('\n', ' ')}\n[学習活動]\n${t.activity}\n[教師支援・発問]\n${t.teacherSupport}\n[配慮・支援（困り感と具体策）]\n${spText}`;
+}).join('\n\n--------------------\n')}
+
+━━━━━━━━━━━━━━━━━━━━
+④ 本時のワークシート（A4配布用）
+━━━━━━━━━━━━━━━━━━━━
+タイトル：${ws.title}
+きょうのめあて：${ws.goal}
+${(ws.questions || []).map(q => {
+  const ch = q.choices && q.choices.length > 0 ? `\n  選択肢：[ ${q.choices.join(' / ')} ]` : '';
+  return `問${q.num}：${q.prompt}${ch}`;
+}).join('\n')}
+【こまったときのヒント】
+${(ws.hints || []).map(h => `・${h}`).join('\n')}
+
+━━━━━━━━━━━━━━━━━━━━
+⑤ 板書計画（黒板レイアウト）
+━━━━━━━━━━━━━━━━━━━━
+【めあて（黄）】${plan.board.goal}
+[左：課題・確認] ${plan.board.leftContent}
+[中央：読み取り・対比] ${plan.board.centerContent}
+★発見（黄）：${plan.board.centerHighlight}
+[右：まとめ（赤枠）] ${plan.board.summary}
+[右：ふりかえり] ${plan.board.rightContent}
+`;
+
+      const textarea = document.createElement('textarea');
+      textarea.value = formattedText;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        showToast("ワークシート・配慮支援・板書計画を含めてコピーしました！");
+      } catch (err) {
+        showToast("コピーに失敗しました。");
+      }
+      document.body.removeChild(textarea);
+    });
+
+    shareLinkBtn.addEventListener('click', async () => {
+        if (!currentLessonData) return;
+
+        const originalText = shareLinkBtn.innerHTML;
+        shareLinkBtn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg> 準備中...`;
+        shareLinkBtn.disabled = true;
+
+        try {
+            // PDF出力用に全セクションを展開
+            document.querySelectorAll('.tab-btn').forEach(b => {
+              b.classList.remove('bg-emerald-800', 'text-white');
+              b.classList.add('bg-slate-100', 'text-slate-700');
+            });
+            const allBtn = document.querySelector('[data-filter="all"]');
+            if(allBtn) {
+              allBtn.classList.remove('bg-slate-100', 'text-slate-700');
+              allBtn.classList.add('bg-emerald-800', 'text-white');
+            }
+            document.querySelectorAll('.filter-section').forEach(sec => {
+              sec.classList.remove('hidden');
+              sec.style.height = 'auto'; 
+            });
+
+            const element = document.getElementById('lessonDocument');
+            const unitName = currentLessonData.unit || '授業案';
+            const filename = `${unitName}_授業案.pdf`;
+
+            const opt = {
+              margin:       [10, 10, 10, 10],
+              filename:     filename,
+              image:        { type: 'jpeg', quality: 0.98 },
+              html2canvas:  { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
+              jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              pagebreak:    { mode: ['css', 'legacy'] }
+            };
+
+            // PDFのBlobを生成
+            const pdfBlob = await html2pdf().set(opt).from(element).outputPdf('blob');
+            const file = new File([pdfBlob], filename, { type: 'application/pdf' });
+
+            // Web Share API でファイル共有が可能かチェック
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: `${unitName} 授業案`,
+                    text: `${unitName}の授業案・ワークシート・板書計画です。`
+                });
+                showToast("共有メニューを開きました。");
+            } else {
+                // 対応していない場合は案内モーダルを表示
+                shareModal.classList.remove('hidden');
+            }
+        } catch (e) {
+            console.error("共有エラー:", e);
+            showToast("共有の準備に失敗しました。");
+        } finally {
+            shareLinkBtn.innerHTML = originalText;
+            shareLinkBtn.disabled = false;
+        }
+    });
+
+    // モーダルを閉じる
+    const closeShareModal = () => shareModal.classList.add('hidden');
+    closeModalBtn.addEventListener('click', closeShareModal);
+    closeModalBtnTop.addEventListener('click', closeShareModal);
+
+    printBtn.addEventListener('click', () => {
+      // 印刷・PDF出力時は全てのセクションを強制的に表示状態にする
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('bg-emerald-800', 'text-white');
+        b.classList.add('bg-slate-100', 'text-slate-700');
+      });
+      const allBtn = document.querySelector('[data-filter="all"]');
+      if(allBtn) {
+        allBtn.classList.remove('bg-slate-100', 'text-slate-700');
+        allBtn.classList.add('bg-emerald-800', 'text-white');
+      }
+      
+      document.querySelectorAll('.filter-section').forEach(sec => {
+        sec.classList.remove('hidden');
+        sec.style.height = 'auto'; 
+      });
+
+      showToast("PDFを作成・ダウンロードしています。少しお待ちください...");
+
+      // html2pdf.js を使用して直接PDFファイルとしてダウンロードする
+      const element = document.getElementById('lessonDocument');
+      const unitName = currentLessonData ? currentLessonData.unit : '授業案';
+      const filename = `${unitName}_授業案.pdf`;
+
+      const opt = {
+        margin:       [10, 10, 10, 10],
+        filename:     filename,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:    { mode: ['css', 'legacy'] }
+      };
+
+      html2pdf().set(opt).from(element).save().then(() => {
+         showToast("PDFのダウンロードが完了しました！");
+      }).catch(err => {
+         console.error("PDF生成エラー:", err);
+         showToast("PDFの作成に失敗しました。");
+      });
+    });
+
+    function setLoading(isLoading, stepMessage) {
+      if (isLoading) {
+        if (stepMessage && loadingStepText) loadingStepText.textContent = stepMessage;
+        loadingBox.classList.remove('hidden');
+        lessonDocument.classList.add('opacity-40', 'pointer-events-none');
+        generateBtn.disabled = true;
+      } else {
+        loadingBox.classList.add('hidden');
+        lessonDocument.classList.remove('opacity-40', 'pointer-events-none');
+        generateBtn.disabled = false;
+      }
+    }
+
+    let toastTimeout;
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMessage').textContent = message;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3200);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>
